@@ -15,7 +15,7 @@ Bleno requires Sudo permissions to run correctly
 
 
 ```bash
-sudo node ble.js
+sudo node index.js
 ```
 
 ## More about this 
