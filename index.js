@@ -72,7 +72,7 @@ WriteOnlyCharacteristic.prototype.onWriteRequest = function(data, offset, withou
 
 };
 
-
+//return status
 let ReadOnlyCharacteristic = function() {
     ReadOnlyCharacteristic.super_.call(this, {
         uuid: uuidConfig.uuidStatus,
@@ -96,7 +96,7 @@ ReadOnlyCharacteristic.prototype.onReadRequest = function (offset, callback) {
     callback(result, data);
 };
 
-
+// Unused, but could be useful
 let NotifyOnlyCharacteristic = function() {
     NotifyOnlyCharacteristic.super_.call(this, {
         uuid: uuidConfig.uuidNotification,
