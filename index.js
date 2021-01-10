@@ -1,3 +1,5 @@
+let uuidConfig  = require('./config/config.json');
+
 let bleno = require("@abandonware/bleno");
 let util  = require('util');
 let wifi  = require('node-wifi');
@@ -12,7 +14,7 @@ console.log('bleno');
 
 let StaticReadOnlyCharacteristic = function() {
     StaticReadOnlyCharacteristic.super_.call(this, {
-        uuid: 'f65c6d3a-4f46-11eb-ae93-0242ac130002',
+        uuid: uuidConfig.uuidDevice,
         properties: ['read'],
         value: Buffer.from('value'),
         descriptors: [
@@ -26,9 +28,11 @@ let StaticReadOnlyCharacteristic = function() {
 
 util.inherits(StaticReadOnlyCharacteristic, BlenoCharacteristic);
 
+
+// Wifi Scan and connect after reading data received from app
 let WriteOnlyCharacteristic = function() {
     WriteOnlyCharacteristic.super_.call(this, {
-        uuid: '19794314-4fd4-11eb-ae93-0242ac130002',
+        uuid: uuidConfig.uuidScanConnect,
         properties: ['write']
     });
 };
@@ -71,7 +75,7 @@ WriteOnlyCharacteristic.prototype.onWriteRequest = function(data, offset, withou
 
 let ReadOnlyCharacteristic = function() {
     ReadOnlyCharacteristic.super_.call(this, {
-        uuid: '19794314-4fd4-11eb-ae93-0242ac13003',
+        uuid: uuidConfig.uuidStatus,
         properties: ['read']
     });
 };
@@ -95,7 +99,7 @@ ReadOnlyCharacteristic.prototype.onReadRequest = function (offset, callback) {
 
 let NotifyOnlyCharacteristic = function() {
     NotifyOnlyCharacteristic.super_.call(this, {
-        uuid: 'fffffffffffffffffffffffffffffff5',
+        uuid: uuidConfig.uuidNotification,
         properties: ['notify']
     });
 };
@@ -128,7 +132,7 @@ NotifyOnlyCharacteristic.prototype.onUnsubscribe = function() {
 
 function SampleService() {
     SampleService.super_.call(this, {
-        uuid: '19794314-4fd4-11eb-ae93-0242ac130002',
+        uuid: uuidConfig.uuidService,
         characteristics: [
             new StaticReadOnlyCharacteristic(),
             new WriteOnlyCharacteristic(),
@@ -144,7 +148,7 @@ bleno.on('stateChange', function(state) {
     console.log('on -> stateChange: ' + state + ', address = ' + bleno.address);
 
     if (state === 'poweredOn') {
-        bleno.startAdvertising('SpectR Display', ['fffffffffffffffffffffffffffffff0']);
+        bleno.startAdvertising('SpectR Display', [uuidConfig.uuidDevice]);
         wifi.init({
             iface: null // network interface, choose a random wifi interface if set to null
         });
