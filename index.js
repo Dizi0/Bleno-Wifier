@@ -4,13 +4,13 @@ let bleno = require("@abandonware/bleno");
 let util  = require('util');
 let wifi  = require('node-wifi');
 let exec  = util.promisify(require('child_process').exec);
+
 let BlenoPrimaryService = bleno.PrimaryService;
 let BlenoCharacteristic = bleno.Characteristic;
 let BlenoDescriptor = bleno.Descriptor;
+let wifiStatus = '{"status" : "neutral"}'
 
-let wifiStatus = '{"status" : "Failed"}'
-
-console.log('bleno');
+console.log('Starting service');
 
 let StaticReadOnlyCharacteristic = function() {
     StaticReadOnlyCharacteristic.super_.call(this, {
@@ -28,7 +28,6 @@ let StaticReadOnlyCharacteristic = function() {
 
 util.inherits(StaticReadOnlyCharacteristic, BlenoCharacteristic);
 
-
 // Wifi Scan and connect after reading data received from app
 let WriteOnlyCharacteristic = function() {
     WriteOnlyCharacteristic.super_.call(this, {
@@ -37,39 +36,47 @@ let WriteOnlyCharacteristic = function() {
     });
 };
 
+
 util.inherits(WriteOnlyCharacteristic, BlenoCharacteristic);
 
 WriteOnlyCharacteristic.prototype.onWriteRequest = function(data, offset, withoutResponse, callback) {
-    const output = Buffer.from(data, 'hex');
-    let payload = JSON.parse(String(output));
+    let payload = data.toString()
 
-    // console.log('WriteOnlyCharacteristic write request: ' + data.toString('hex') + ' ' + offset + ' ' + withoutResponse);
+// I'd rather using json, but JSON.parse(payload) result in an error I couldn't fix
+    let wifiData = payload.split('|');
+
+    let ssid = wifiData[0];
+    let pwd = wifiData[1];
+
     wifi.scan((error, networks) => {
+        console.log("Starting Wi-Fi Scan");
         if (error) {
             console.log(error);
         } else {
             exec('sudo iwlist scan');
-            // console.log(payload);
+            console.log("Checking Wi-Fi list with " + ssid);
             networks.forEach(network =>{
-                if(payload.ssid === network.ssid){
-                    console.log("Succes, wifi found")
-                    wifiStatus = '{"status" : "Success"}'
-                    wifi.connect({ ssid: payload.ssid, password: payload.pwd }, error => {
+                console.log(ssid +  " : " + pwd);
+                if(network.ssid.localeCompare(ssid) === 0){
+                    console.log("Success, "+ ssid +" found");
+                    wifi.connect({ ssid: ssid, password: pwd }, error => {
                         if (error) {
-                            console.log(error);
-                            wifiStatus = "Failed"
+                            console.log('Connexion Failed')
+                            console.log(ssid +  " : " + pwd);
+                            wifiStatus = '{"status" : "Failed :'+ error +' "}'
                         }
                         else{
+                            wifiStatus = '{"status" : "Success"}'
                             console.log('Connected');
+                            bleno.disconnect();
+                            bleno.stopAdvertising();
                         }
                     });
                 }
             });
-
         }
     });
     callback(this.RESULT_SUCCESS);
-
 };
 
 //return status
@@ -113,7 +120,6 @@ NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateVa
     this.changeInterval = setInterval(function() {
         let data = Buffer.alloc(4);
         data.writeUInt32LE(this.counter, 0);
-
         console.log('NotifyOnlyCharacteristic update value: ' + this.counter);
         updateValueCallback(data);
         this.counter++;
@@ -161,7 +167,6 @@ bleno.on('stateChange', function(state) {
 // Linux only events /////////////////
 bleno.on('accept', function(clientAddress) {
     console.log('on -> accept, client: ' + clientAddress);
-    console.log()
     bleno.updateRssi();
 
 });
