@@ -58,7 +58,6 @@ let WriteOnlyCharacteristic = function() {
     });
 };
 
-
 util.inherits(WriteOnlyCharacteristic, BlenoCharacteristic);
 
 WriteOnlyCharacteristic.prototype.onWriteRequest = function(data, offset, withoutResponse, callback) {
@@ -126,55 +125,7 @@ ReadOnlyCharacteristic.prototype.onReadRequest = function (offset, callback) {
 };
 
 
-let ReadOnlyWifi = function() {
-    ReadOnlyWifi.super_.call(this, {
-        uuid: uuidConfig.uuidWifiList,
-        properties: ['read']
-    });
-};
-
-util.inherits(ReadOnlyWifi, BlenoCharacteristic);
-
-ReadOnlyWifi.prototype.onReadRequest = function (offset, callback) {
-    let wifiResult = this.RESULT_SUCCESS;
-    let swapArr;
-    let counter = 0;
-    exec('sudo iwlist scan');
-    wifi
-        .scan()
-        .then(networks => {
-            networks.forEach(network => {
-                if(wifiList.length < 10 && !wifiList.includes(network.ssid) && network.ssid !== ""){
-                    wifiList.push(network.ssid);
-                }
-            })
-            if(counter === 0) {
-                wifiList = Buffer.from(wifiList.toString())
-                counter = 1;
-            }
-            console.log(wifiList.toString());
-            console.log(wifiList.length);
-            console.log(offset);
-
-            if (offset > wifiList.length) {
-                wifiResult = this.RESULT_INVALID_OFFSET;
-                wifiList = null;
-                console.log("Error");
-            } else {
-                swapArr =  wifiList.toString().split(',').slice(0,-1).toString();
-                wifiList = Buffer.from(swapArr);
-                wifiList = this.RESULT_SUCCESS
-            }
-            console.log(wifiList.toString())
-            callback(wifiResult, wifiList);
-        })
-        .catch(error => {
-            wifiStatus = '{"status" : "Failed :'+ error +' "}'
-        });
-}
-
-
-// Unused, but could be useful
+// Scans for Wi-Fi, then sends data back to the phone, since Ionic can't scan for Wi-Fi (Unless it's the current connected network)
 let NotifyOnlyCharacteristic = function() {
     NotifyOnlyCharacteristic.super_.call(this, {
         uuid: uuidConfig.uuidNotification,
@@ -194,12 +145,15 @@ NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateVa
             networks.forEach(network => {
                 if(network.ssid !== ""){
                     this.changeInterval = setInterval(function() {
-                        let data = Buffer.from(network.ssid);
-                        console.log('NotifyOnlyCharacteristic new SSID: ' + network.ssid);
-                        updateValueCallback(data);
-
+                        if(network.ssid !== '' && !wifiList.includes(network.ssid)){
+                            wifiList.push(network.ssid)
+                            let data = Buffer.from(network.ssid);
+                            console.log('NotifyOnlyCharacteristic new SSID: ' + network.ssid);
+                            updateValueCallback(data);
+                        }
                     }.bind(this), 1000)
                 }
+
             })
             // networks
         })
@@ -207,7 +161,7 @@ NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateVa
             // error
         });
     this.counter = 0;
-;
+    ;
 };
 
 NotifyOnlyCharacteristic.prototype.onUnsubscribe = function() {
@@ -227,7 +181,7 @@ function SampleService() {
             new StaticReadOnlyCharacteristic(),
             new WriteOnlyCharacteristic(),
             new ReadOnlyCharacteristic(),
-            new ReadOnlyWifi(),
+            // new ReadOnlyWifi(),
             new NotifyOnlyCharacteristic(),
         ]
     });
@@ -251,6 +205,7 @@ bleno.on('stateChange', function(state) {
 
 // Linux only events /////////////////
 bleno.on('accept', function(clientAddress) {
+    console.log("////////////////////////////////////////")
     console.log('on -> accept, client: ' + clientAddress);
     bleno.updateRssi();
 
