@@ -20,6 +20,18 @@ function removeDups(names) {
     return Object.keys(unique);
 }
 
+function ab2str(buf) {
+    return String.fromCharCode.apply(null, new Uint16Array(buf));
+}
+function str2ab(str) {
+    var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+    var bufView = new Uint16Array(buf);
+    for (var i=0, strLen=str.length; i < strLen; i++) {
+        bufView[i] = str.charCodeAt(i);
+    }
+    return buf;
+}
+
 console.log('Starting service');
 
 let StaticReadOnlyCharacteristic = function() {
@@ -124,33 +136,22 @@ let ReadOnlyWifi = function() {
 util.inherits(ReadOnlyWifi, BlenoCharacteristic);
 
 ReadOnlyWifi.prototype.onReadRequest = function (offset, callback) {
-
+    let wifiResult = this.RESULT_SUCCESS;
     exec('sudo iwlist scan');
     wifi
         .scan()
         .then(networks => {
-            networks.forEach(network =>{
-                if(network.ssid !== ''){
-                    wifiList.push(network.ssid)
-                }
+            networks.forEach(network => {
+                wifiList.push(network.ssid);
             })
-            wifiList = removeDups(wifiList)
-            // networks = removeDups(networks);
-            // console.log(JSON.parse(networks));
-            // wifiList = networks.slice(0,5);
-            // console.log(wifiList);
-            // wifiList.forEach(network =>{
-            //     console.log(network)
-            //
-            // console.log(JSON.stringify(wifiList));
-            // wifiList = Buffer.from(wifiList.toString());
-            // console.log(wifiList.toString());
-            // let wifiResult = this.RESULT_SUCCESS;
-            // callback(wifiResult, wifiList);
-            // networks
+            wifiList = Buffer.from([networks[0].ssid , networks[1].ssid , networks[2].ssid , networks[3].ssid , networks[4].ssid].toString())
+            console.log(wifiList.toString());
+            console.log(offset);
+            callback(wifiResult, wifiList.slice(offset));
+
         })
         .catch(error => {
-            // error
+            wifiStatus = '{"status" : "Failed :'+ error +' "}'
         });
 }
 
