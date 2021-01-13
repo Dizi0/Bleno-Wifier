@@ -137,18 +137,36 @@ util.inherits(ReadOnlyWifi, BlenoCharacteristic);
 
 ReadOnlyWifi.prototype.onReadRequest = function (offset, callback) {
     let wifiResult = this.RESULT_SUCCESS;
+    let swapArr;
+    let counter = 0;
     exec('sudo iwlist scan');
     wifi
         .scan()
         .then(networks => {
             networks.forEach(network => {
-                wifiList.push(network.ssid);
+                if(wifiList.length < 10 && !wifiList.includes(network.ssid) && network.ssid !== ""){
+                    wifiList.push(network.ssid);
+                }
             })
-            wifiList = Buffer.from([networks[0].ssid , networks[1].ssid , networks[2].ssid , networks[3].ssid , networks[4].ssid].toString())
+            if(counter === 0) {
+                wifiList = Buffer.from(wifiList.toString())
+                counter = 1;
+            }
             console.log(wifiList.toString());
+            console.log(wifiList.length);
             console.log(offset);
-            callback(wifiResult, wifiList.slice(offset));
 
+            if (offset > wifiList.length) {
+                wifiResult = this.RESULT_INVALID_OFFSET;
+                wifiList = null;
+                console.log("Error");
+            } else {
+                swapArr =  wifiList.toString().split(',').slice(0,-1).toString();
+                wifiList = Buffer.from(swapArr);
+                wifiList = this.RESULT_SUCCESS
+            }
+            console.log(wifiList.toString())
+            callback(wifiResult, wifiList);
         })
         .catch(error => {
             wifiStatus = '{"status" : "Failed :'+ error +' "}'
@@ -168,15 +186,28 @@ util.inherits(NotifyOnlyCharacteristic, BlenoCharacteristic);
 
 NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
     console.log('NotifyOnlyCharacteristic subscribe');
+    exec('sudo iwlist scan');
 
+    wifi
+        .scan()
+        .then(networks => {
+            networks.forEach(network => {
+                if(network.ssid !== ""){
+                    this.changeInterval = setInterval(function() {
+                        let data = Buffer.from(network.ssid);
+                        console.log('NotifyOnlyCharacteristic new SSID: ' + network.ssid);
+                        updateValueCallback(data);
+
+                    }.bind(this), 1000)
+                }
+            })
+            // networks
+        })
+        .catch(error => {
+            // error
+        });
     this.counter = 0;
-    this.changeInterval = setInterval(function() {
-        let data = Buffer.alloc(4);
-        data.writeUInt32LE(this.counter, 0);
-        console.log('NotifyOnlyCharacteristic update value: ' + this.counter);
-        updateValueCallback(data);
-        this.counter++;
-    }.bind(this), 5000);
+;
 };
 
 NotifyOnlyCharacteristic.prototype.onUnsubscribe = function() {
