@@ -24,9 +24,9 @@ function ab2str(buf) {
     return String.fromCharCode.apply(null, new Uint16Array(buf));
 }
 function str2ab(str) {
-    var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
-    var bufView = new Uint16Array(buf);
-    for (var i=0, strLen=str.length; i < strLen; i++) {
+    let buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+    let bufView = new Uint16Array(buf);
+    for (let i=0, strLen=str.length; i < strLen; i++) {
         bufView[i] = str.charCodeAt(i);
     }
     return buf;
@@ -137,6 +137,7 @@ util.inherits(NotifyOnlyCharacteristic, BlenoCharacteristic);
 
 NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
     console.log('NotifyOnlyCharacteristic subscribe');
+    wifiList = [];
     exec('sudo iwlist scan');
 
     wifi
@@ -147,21 +148,20 @@ NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateVa
                     this.changeInterval = setInterval(function() {
                         if(network.ssid !== '' && !wifiList.includes(network.ssid)){
                             wifiList.push(network.ssid)
-                            let data = Buffer.from(network.ssid);
-                            console.log('NotifyOnlyCharacteristic new SSID: ' + network.ssid);
+                            let data = new TextEncoder("utf-8").encode(network.ssid);
+                            console.log(data)
+                            console.log('SSID: ' + network.ssid);
                             updateValueCallback(data);
                         }
                     }.bind(this), 1000)
                 }
-
             })
             // networks
         })
         .catch(error => {
-            // error
+            console.log(error);
         });
     this.counter = 0;
-    ;
 };
 
 NotifyOnlyCharacteristic.prototype.onUnsubscribe = function() {
