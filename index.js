@@ -1,14 +1,24 @@
 let uuidConfig  = require('./config/config.json');
-
 let bleno = require("@abandonware/bleno");
 let util  = require('util');
 let wifi  = require('node-wifi');
 let exec  = util.promisify(require('child_process').exec);
-
 let BlenoPrimaryService = bleno.PrimaryService;
 let BlenoCharacteristic = bleno.Characteristic;
 let BlenoDescriptor = bleno.Descriptor;
 let wifiStatus = '{"status" : "neutral"}'
+
+let wifiList = [];
+
+function removeDups(names) {
+    let unique = {};
+    names.forEach(function(i) {
+        if(!unique[i]) {
+            unique[i] = true;
+        }
+    });
+    return Object.keys(unique);
+}
 
 console.log('Starting service');
 
@@ -103,6 +113,48 @@ ReadOnlyCharacteristic.prototype.onReadRequest = function (offset, callback) {
     callback(result, data);
 };
 
+
+let ReadOnlyWifi = function() {
+    ReadOnlyWifi.super_.call(this, {
+        uuid: uuidConfig.uuidWifiList,
+        properties: ['read']
+    });
+};
+
+util.inherits(ReadOnlyWifi, BlenoCharacteristic);
+
+ReadOnlyWifi.prototype.onReadRequest = function (offset, callback) {
+
+    exec('sudo iwlist scan');
+    wifi
+        .scan()
+        .then(networks => {
+            networks.forEach(network =>{
+                if(network.ssid !== ''){
+                    wifiList.push(network.ssid)
+                }
+            })
+            wifiList = removeDups(wifiList)
+            // networks = removeDups(networks);
+            // console.log(JSON.parse(networks));
+            // wifiList = networks.slice(0,5);
+            // console.log(wifiList);
+            // wifiList.forEach(network =>{
+            //     console.log(network)
+            //
+            // console.log(JSON.stringify(wifiList));
+            // wifiList = Buffer.from(wifiList.toString());
+            // console.log(wifiList.toString());
+            // let wifiResult = this.RESULT_SUCCESS;
+            // callback(wifiResult, wifiList);
+            // networks
+        })
+        .catch(error => {
+            // error
+        });
+}
+
+
 // Unused, but could be useful
 let NotifyOnlyCharacteristic = function() {
     NotifyOnlyCharacteristic.super_.call(this, {
@@ -143,6 +195,7 @@ function SampleService() {
             new StaticReadOnlyCharacteristic(),
             new WriteOnlyCharacteristic(),
             new ReadOnlyCharacteristic(),
+            new ReadOnlyWifi(),
             new NotifyOnlyCharacteristic(),
         ]
     });
