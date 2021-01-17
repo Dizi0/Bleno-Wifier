@@ -20,18 +20,6 @@ function removeDups(names) {
     return Object.keys(unique);
 }
 
-function ab2str(buf) {
-    return String.fromCharCode.apply(null, new Uint16Array(buf));
-}
-function str2ab(str) {
-    let buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
-    let bufView = new Uint16Array(buf);
-    for (let i=0, strLen=str.length; i < strLen; i++) {
-        bufView[i] = str.charCodeAt(i);
-    }
-    return buf;
-}
-
 console.log('Starting service');
 
 let StaticReadOnlyCharacteristic = function() {
@@ -42,7 +30,7 @@ let StaticReadOnlyCharacteristic = function() {
         descriptors: [
             new BlenoDescriptor({
                 uuid: '2901',
-                value: 'Spectr Display'
+                value: 'RPI BLE'
             })
         ]
     });
@@ -68,35 +56,24 @@ WriteOnlyCharacteristic.prototype.onWriteRequest = function(data, offset, withou
 
     let ssid = wifiData[0];
     let pwd = wifiData[1];
+    payload = {
+        ssid: ssid.replace(/\x00/g, ""),
+        password: pwd.replace(/\x00/g, ""),
+    };
+    console.log(payload)
+    if(wifiList.includes(payload.ssid)){
+        wifi.connect({ssid : payload.ssid , password: payload.password}, error => {
+            if (error) {
+                this.wifiStatus = '{"status" : "Wrong password"}'
+                console.log(error);
+            }else{
 
-    wifi.scan((error, networks) => {
-        console.log("Starting Wi-Fi Scan");
-        if (error) {
-            console.log(error);
-        } else {
-            exec('sudo iwlist scan');
-            console.log("Checking Wi-Fi list with " + ssid);
-            networks.forEach(network =>{
-                console.log(ssid +  " : " + pwd);
-                if(network.ssid.localeCompare(ssid) === 0){
-                    console.log("Success, "+ ssid +" found");
-                    wifi.connect({ ssid: ssid, password: pwd }, error => {
-                        if (error) {
-                            console.log('Connexion Failed')
-                            console.log(ssid +  " : " + pwd);
-                            wifiStatus = '{"status" : "Failed :'+ error +' "}'
-                        }
-                        else{
-                            wifiStatus = '{"status" : "Success"}'
-                            console.log('Connected');
-                            bleno.disconnect();
-                            bleno.stopAdvertising();
-                        }
-                    });
-                }
-            });
-        }
-    });
+                console.log('Connected');
+                this.wifiStatus = '{"status" : "Success"}'
+                bleno.stopAdvertising()
+            }
+        });
+    }
     callback(this.RESULT_SUCCESS);
 };
 
@@ -149,7 +126,7 @@ NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateVa
                         if(network.ssid !== '' && !wifiList.includes(network.ssid)){
                             wifiList.push(network.ssid)
                             let data = new TextEncoder("utf-8").encode(network.ssid);
-                            console.log(data)
+                            // console.log(data)
                             console.log('SSID: ' + network.ssid);
                             updateValueCallback(data);
                         }
@@ -181,7 +158,6 @@ function SampleService() {
             new StaticReadOnlyCharacteristic(),
             new WriteOnlyCharacteristic(),
             new ReadOnlyCharacteristic(),
-            // new ReadOnlyWifi(),
             new NotifyOnlyCharacteristic(),
         ]
     });
@@ -193,7 +169,7 @@ bleno.on('stateChange', function(state) {
     console.log('on -> stateChange: ' + state + ', address = ' + bleno.address);
 
     if (state === 'poweredOn') {
-        bleno.startAdvertising('SpectR Display', [uuidConfig.uuidDevice]);
+        bleno.startAdvertising('RPI BLE', [uuidConfig.uuidDevice]);
         wifi.init({
             iface: null // network interface, choose a random wifi interface if set to null
         });
