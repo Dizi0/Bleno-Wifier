@@ -115,8 +115,7 @@ util.inherits(NotifyOnlyCharacteristic, BlenoCharacteristic);
 NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
     console.log('NotifyOnlyCharacteristic subscribe');
     wifiList = [];
-    exec('sudo iwlist scan');
-
+    exec('sudo iwlist wlan0 scan');
     wifi
         .scan()
         .then(networks => {
