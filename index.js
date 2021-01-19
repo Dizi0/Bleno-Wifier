@@ -3,11 +3,12 @@ let bleno = require("@abandonware/bleno");
 let util  = require('util');
 let wifi  = require('node-wifi');
 let exec  = util.promisify(require('child_process').exec);
+
 let BlenoPrimaryService = bleno.PrimaryService;
 let BlenoCharacteristic = bleno.Characteristic;
 let BlenoDescriptor = bleno.Descriptor;
-let wifiStatus = '{"status" : "neutral"}'
 
+let wifiStatus = '{"status" : "neutral"}'
 let wifiList = [];
 
 function removeDups(names) {
@@ -114,30 +115,24 @@ util.inherits(NotifyOnlyCharacteristic, BlenoCharacteristic);
 
 NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
     console.log('NotifyOnlyCharacteristic subscribe');
-    wifiList = [];
-    exec('sudo iwlist wlan0 scan');
-    wifi
-        .scan()
-        .then(networks => {
-            networks.forEach(network => {
-                if(network.ssid !== ""){
-                    this.changeInterval = setInterval(function() {
-                        if(network.ssid !== '' && !wifiList.includes(network.ssid)){
-                            wifiList.push(network.ssid)
-                            let data = new TextEncoder("utf-8").encode(network.ssid);
-                            // console.log(data)
-                            console.log('SSID: ' + network.ssid);
-                            updateValueCallback(data);
-                        }
-                    }.bind(this), 1000)
-                }
-            })
-            // networks
+    exec("sudo iwlist wlan0 scan | grep ESSID", (error, stdout, stderr) => {
+        if (error) {
+            console.log(`error: ${error.message}`);
+            return;
+        }
+        if (stderr) {
+            console.log(`stderr: ${stderr}`);
+            return;
+        }
+        let data = stdout.replaceAll('ESSID:', '').trim().split('"')
+        data.forEach(wifi =>{
+            if(wifi !== '\n                    ' && wifi.length > 8){
+                let data = new TextEncoder("utf-8").encode(wifi);
+                console.log('SSID: ' + wifi);
+                updateValueCallback(data);
+            }
         })
-        .catch(error => {
-            console.log(error);
-        });
-    this.counter = 0;
+    });
 };
 
 NotifyOnlyCharacteristic.prototype.onUnsubscribe = function() {
