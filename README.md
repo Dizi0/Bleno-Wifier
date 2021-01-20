@@ -1,6 +1,7 @@
-# RpiBlenoWifiConnector
+# Bleno Wifier
 A bluetooth program to connect your Rpi to your wi-fi when you don't have access to basic inputs (SSH, keyboard and mouse)
 
+This script was created in order to work with this app : [Ionic BLE Wifi connector](https://github.com/Dizi0/Ionic-BLE-Wifi-app) 
 
 ## Installation
 
