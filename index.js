@@ -2,24 +2,13 @@ let uuidConfig  = require('./config/config.json');
 let bleno = require("@abandonware/bleno");
 let util  = require('util');
 let wifi  = require('node-wifi');
-let exec  = util.promisify(require('child_process').exec);
 
 let BlenoPrimaryService = bleno.PrimaryService;
 let BlenoCharacteristic = bleno.Characteristic;
 let BlenoDescriptor = bleno.Descriptor;
-
 let wifiStatus = '{"status" : "neutral"}'
-let wifiList = [];
 
-function removeDups(names) {
-    let unique = {};
-    names.forEach(function(i) {
-        if(!unique[i]) {
-            unique[i] = true;
-        }
-    });
-    return Object.keys(unique);
-}
+let wifiList = [];
 
 console.log('Starting service');
 
@@ -61,16 +50,15 @@ WriteOnlyCharacteristic.prototype.onWriteRequest = function(data, offset, withou
         ssid: ssid.replace(/\x00/g, ""),
         password: pwd.replace(/\x00/g, ""),
     };
-    console.log(payload)
     if(wifiList.includes(payload.ssid)){
         wifi.connect({ssid : payload.ssid , password: payload.password}, error => {
             if (error) {
                 this.wifiStatus = '{"status" : "Wrong password"}'
                 console.log(error);
             }else{
-
                 console.log('Connected');
                 this.wifiStatus = '{"status" : "Success"}'
+                console.log(this.wifiStatus)
                 bleno.stopAdvertising()
             }
         });
@@ -102,7 +90,6 @@ ReadOnlyCharacteristic.prototype.onReadRequest = function (offset, callback) {
     callback(result, data);
 };
 
-
 // Scans for Wi-Fi, then sends data back to the phone, since Ionic can't scan for Wi-Fi (Unless it's the current connected network)
 let NotifyOnlyCharacteristic = function() {
     NotifyOnlyCharacteristic.super_.call(this, {
@@ -115,35 +102,37 @@ util.inherits(NotifyOnlyCharacteristic, BlenoCharacteristic);
 
 NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
     console.log('NotifyOnlyCharacteristic subscribe');
-    exec("sudo iwlist wlan0 scan | grep ESSID", (error, stdout, stderr) => {
-        if (error) {
-            console.log(`error: ${error.message}`);
-            return;
-        }
-        if (stderr) {
-            console.log(`stderr: ${stderr}`);
-            return;
-        }
-        let data = stdout.replaceAll('ESSID:', '').trim().split('"')
-        data.forEach(wifi =>{
-            if(wifi !== '\n                    ' && wifi.length > 8){
-                let data = new TextEncoder("utf-8").encode(wifi);
-                console.log('SSID: ' + wifi);
-                updateValueCallback(data);
-            }
+    wifiList = [];
+    wifi
+        .scan()
+        .then(networks => {
+            networks.forEach(network => {
+                if(network.ssid !== ""){
+                    this.changeInterval = setInterval(function() {
+                        if(network.ssid !== '' && !wifiList.includes(network.ssid)){
+                            wifiList.push(network.ssid)
+                            let data = new TextEncoder("utf-8").encode(network.ssid);
+                            // console.log(data)
+                            console.log('SSID: ' + network.ssid);
+                            updateValueCallback(data);
+                        }
+                    }.bind(this), 1000)
+                }
+            })
         })
-    });
+        .catch(error => {
+            console.log(error);
+        });
+    this.counter = 0;
 };
 
 NotifyOnlyCharacteristic.prototype.onUnsubscribe = function() {
     console.log('NotifyOnlyCharacteristic unsubscribe');
-
     if (this.changeInterval) {
         clearInterval(this.changeInterval);
         this.changeInterval = null;
     }
 };
-
 
 function SampleService() {
     SampleService.super_.call(this, {
@@ -205,6 +194,7 @@ bleno.on('advertisingStart', function(error) {
 });
 
 bleno.on('advertisingStop', function() {
+    console.log(this.wifiStatus)
     console.log('on -> advertisingStop');
 });
 
