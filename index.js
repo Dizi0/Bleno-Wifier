@@ -10,6 +10,18 @@ let wifiStatus = '{"status" : "neutral"}'
 
 let wifiList = [];
 
+function ab2str(buf) {
+    return String.fromCharCode.apply(null, new Uint8Array(buf));
+}
+function str2ab(str) {
+    let buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+    let bufView = new Uint8Array(buf);
+    for (var i=0, strLen=str.length; i < strLen; i++) {
+        bufView[i] = str.charCodeAt(i);
+    }
+    return buf;
+}
+
 console.log('Starting service');
 
 let StaticReadOnlyCharacteristic = function() {
@@ -90,6 +102,43 @@ ReadOnlyCharacteristic.prototype.onReadRequest = function (offset, callback) {
     callback(result, data);
 };
 
+
+let DebugOnly = function() {
+    DebugOnly.super_.call(this, {
+        uuid: "ff03548",
+        properties: ['read']
+    });
+};
+
+util.inherits(DebugOnly, BlenoCharacteristic);
+
+DebugOnly.prototype.onReadRequest = function (offset, callback) {
+
+
+    console.log('DEBUG');
+    wifiList = [];
+    let i = 0;
+    wifi
+        .scan()
+        .then(networks => {
+            networks.forEach(network => {
+                if(network.ssid !== '' && !wifiList.includes(network.ssid)){
+                    wifiList.push(new TextEncoder("utf-8").encode(network.ssid))
+                    console.log(data)
+                    console.log('SSID: ' + network.ssid);
+                }
+            })
+        })
+        .catch(error => {
+            console.log(error);
+        });
+    let result = this.RESULT_SUCCESS;
+    console.log(wifiList);
+    let data = Buffer.from(wifiList);
+
+    callback(result, data);
+};
+
 // Scans for Wi-Fi, then sends data back to the phone, since Ionic can't scan for Wi-Fi (Unless it's the current connected network)
 let NotifyOnlyCharacteristic = function() {
     NotifyOnlyCharacteristic.super_.call(this, {
@@ -102,28 +151,29 @@ util.inherits(NotifyOnlyCharacteristic, BlenoCharacteristic);
 
 NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
     console.log('NotifyOnlyCharacteristic subscribe');
+    let wifiname = '';
     wifiList = [];
-    wifi
-        .scan()
-        .then(networks => {
-            networks.forEach(network => {
-                if(network.ssid !== ""){
-                    this.changeInterval = setInterval(function() {
-                        if(network.ssid !== '' && !wifiList.includes(network.ssid)){
-                            wifiList.push(network.ssid)
-                            let data = new TextEncoder("utf-8").encode(network.ssid);
-                            // console.log(data)
-                            console.log('SSID: ' + network.ssid);
-                            updateValueCallback(data);
-                        }
-                    }.bind(this), 1000)
+    wifi.scan().then(networks => {
+            let counter = 0
+            console.log(networks.length)
+            updateValueCallback(new TextEncoder().encode('START'))
+            console.log('START')
+            while(counter < networks.length){
+                if(networks[counter].ssid !== ''){
+                    wifiname = networks[counter].ssid
+                    console.log('SSID: ' + wifiname)
+                    wifiList.push(wifiname)
+                    updateValueCallback(new TextEncoder().encode(wifiname));
                 }
-            })
-        })
+                ++counter;
+            }
+            updateValueCallback(new TextEncoder().encode('END'))
+            console.log('END')
+        }
+    )
         .catch(error => {
             console.log(error);
         });
-    this.counter = 0;
 };
 
 NotifyOnlyCharacteristic.prototype.onUnsubscribe = function() {
@@ -141,6 +191,7 @@ function SampleService() {
             new StaticReadOnlyCharacteristic(),
             new WriteOnlyCharacteristic(),
             new ReadOnlyCharacteristic(),
+            new DebugOnly(),
             new NotifyOnlyCharacteristic(),
         ]
     });
